@@ -9,11 +9,12 @@ const vehicleSchema = new mongoose.Schema({
   seatingCapacity: { type: Number },
   price: { type: Number, required: true },
   location: { type: String, required: true },
-  registration: { type: String, required: true },
+  registration: { type: String, required: true, unique: true },
   insuranceImage: { type: String },
   images: [{ type: String }],
   availability: { type: Boolean, default: true },
   isApproved: { type: Boolean, default: false },
+  rejectionReason: { type: String },
   rating: { type: Number, default: 0 },
 });
 

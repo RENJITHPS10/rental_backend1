@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser, updateProfile } = require('../controllers/userController');
 const auth = require('../middleware/auth');
-const upload=require('../middleware/cloudinary')
+const upload = require('../middleware/cloudinary');
+const { registerUser, loginUser, updateProfile, getLicenseStatus } = require('../controllers/userController');
 
-router.post('/register',upload.single('license'), registerUser);
+router.post('/register', upload.single('license'), registerUser);
 router.post('/login', loginUser);
-router.put('/profile',upload.single('license'),auth,updateProfile);
+router.put('/profile', auth, upload.single('license'), updateProfile);
+router.get('/license-status', auth, getLicenseStatus);
 
 module.exports = router;

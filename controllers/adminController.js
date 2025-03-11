@@ -18,24 +18,7 @@ exports.manageUser = async (req, res) => {
 
     res.json({ msg: 'User updated', user });
   } catch (err) {
-    res.status(500).json({ msg: 'Server error' });
-  }
-};
-
-exports.approveVehicle = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    if (req.user.role !== 'admin') return res.status(403).json({ msg: 'Not authorized' });
-
-    const vehicle = await Vehicle.findById(id);
-    if (!vehicle) return res.status(404).json({ msg: 'Vehicle not found' });
-
-    vehicle.isApproved = true;
-    await vehicle.save();
-
-    res.json({ msg: 'Vehicle approved', vehicle });
-  } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
@@ -50,6 +33,7 @@ exports.getAllBookings = async (req, res) => {
       .populate('driver', 'name');
     res.json(bookings);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
@@ -70,6 +54,40 @@ exports.detectFraud = async (req, res) => {
 
     res.json({ msg: 'Fraud detection results', potentialFraud });
   } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+exports.getAllUsers = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ msg: 'Not authorized' });
+
+    const users = await User.find().select('-password');
+    res.json(users);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+exports.suspendUser = async (req, res) => {
+  const { id } = req.params;
+  const { suspend } = req.body;
+
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ msg: 'Not authorized' });
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+    if (suspend === undefined) return res.status(400).json({ msg: 'Suspend status required' });
+
+    user.isSuspended = suspend;
+    await user.save();
+
+    res.json({ msg: `User ${suspend ? 'suspended' : 'unsuspended'}`, user });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };

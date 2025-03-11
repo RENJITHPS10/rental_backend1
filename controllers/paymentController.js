@@ -7,8 +7,7 @@ exports.createPayment = async (req, res) => {
 
   try {
     const booking = await Booking.findById(bookingId);
-    if (!booking) return res.status(404).json({ msg: 'Booking not found' });
-    if (booking.customer.toString() !== req.user.id) {
+    if (!booking || booking.customer.toString() !== req.user.id) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
@@ -40,6 +39,7 @@ exports.createPayment = async (req, res) => {
       status: paymentIntent.status,
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Payment error', error: err.message });
   }
 };

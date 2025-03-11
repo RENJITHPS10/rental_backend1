@@ -1,34 +1,17 @@
 const Vehicle = require('../models/Vehicle');
-const cloudinary = require('cloudinary').v2;
 
 exports.addVehicle = async (req, res) => {
   const { type, category, model, fuelType, seatingCapacity, price, location, registration } = req.body;
 
-  if (!type || !category || !model || !price || !location || !registration) {
-    return res.status(400).json({ msg: 'Please provide all required fields' });
-  }
-
-  if (!['car', 'bike'].includes(type)) {
-    return res.status(400).json({ msg: 'Invalid vehicle type' });
-  }
-
   try {
     const existingVehicle = await Vehicle.findOne({ registration });
-    if (existingVehicle) return res.status(400).json({ msg: 'Vehicle with this registration number already exists' });
+    if (existingVehicle) return res.status(400).json({ msg: 'Vehicle already exists' });
 
     let images = [];
     if (req.files && req.files['images']) {
-      for (const file of req.files['images']) {
-        const result = await cloudinary.uploader.upload(file.path);
-        images.push(result.secure_url);
-      }
+      images = req.files['images'].map(file => file.path); // Cloudinary URLs
     }
-
-    let insuranceImage = null;
-    if (req.files && req.files['insuranceImage']) {
-      const result = await cloudinary.uploader.upload(req.files['insuranceImage'][0].path);
-      insuranceImage = result.secure_url;
-    }
+    const insuranceImage = req.files['insuranceImage'] ? req.files['insuranceImage'][0].path : null;
 
     const vehicle = new Vehicle({
       owner: req.user.id,
@@ -43,9 +26,8 @@ exports.addVehicle = async (req, res) => {
       insuranceImage,
       images,
     });
-
     await vehicle.save();
-    res.status(201).json({ msg: 'Vehicle added successfully', vehicle });
+    res.status(201).json({ msg: 'Vehicle added', vehicle });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });
@@ -54,15 +36,18 @@ exports.addVehicle = async (req, res) => {
 
 exports.getVehicles = async (req, res) => {
   try {
-    const { location, priceMax, type, fuelType } = req.query;
-    let query = { availability: true, isApproved: true };
-    if (location) query.location = location;
+    const { location, priceMax, type, fuelType, all } = req.query;
+    let query = req.user?.role === 'admin' && all === 'true' ? {} : { availability: true, isApproved: true };
+
+    if (location) query.location = { $regex: location, $options: 'i' };
     if (priceMax) query.price = { $lte: Number(priceMax) };
     if (type) query.type = type;
     if (fuelType) query.fuelType = fuelType;
+
     const vehicles = await Vehicle.find(query).populate('owner', 'name');
     res.json(vehicles);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
@@ -72,6 +57,7 @@ exports.getOwnerVehicles = async (req, res) => {
     const vehicles = await Vehicle.find({ owner: req.user.id }).populate('owner', 'name');
     res.json(vehicles);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
@@ -81,56 +67,51 @@ exports.updateVehicle = async (req, res) => {
 
   try {
     const vehicle = await Vehicle.findById(req.params.id);
-    if (!vehicle) return res.status(404).json({ msg: 'Vehicle not found' });
-    if (vehicle.owner.toString() !== req.user.id) return res.status(403).json({ msg: 'Not authorized' });
+    if (!vehicle || vehicle.owner.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
 
     let images = vehicle.images;
     if (req.files && req.files['images']) {
-      images = [];
-      for (const file of req.files['images']) {
-        const result = await cloudinary.uploader.upload(file.path);
-        images.push(result.secure_url);
-      }
+      images = req.files['images'].map(file => file.path);
     }
-
-    let insuranceImage = vehicle.insuranceImage;
-    if (req.files && req.files['insuranceImage']) {
-      const result = await cloudinary.uploader.upload(req.files['insuranceImage'][0].path);
-      insuranceImage = result.secure_url;
-    }
+    const insuranceImage = req.files['insuranceImage'] ? req.files['insuranceImage'][0].path : vehicle.insuranceImage;
 
     vehicle.price = price || vehicle.price;
     vehicle.availability = availability !== undefined ? availability : vehicle.availability;
     vehicle.images = images;
     vehicle.insuranceImage = insuranceImage;
-
     await vehicle.save();
 
     res.json({ msg: 'Vehicle updated', vehicle });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
 
 exports.deleteVehicle = async (req, res) => {
+  const cloudinary = require('../config/cloudinary');
+
   try {
     const vehicle = await Vehicle.findById(req.params.id);
-    if (!vehicle) return res.status(404).json({ msg: 'Vehicle not found' });
-    if (vehicle.owner.toString() !== req.user.id) return res.status(403).json({ msg: 'Not authorized' });
+    if (!vehicle || vehicle.owner.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
 
-    if (vehicle.images && vehicle.images.length > 0) {
-      for (const imageUrl of vehicle.images) {
-        const publicId = imageUrl.split('/').pop().split('.')[0];
-        await cloudinary.uploader.destroy(publicId);
+    if (vehicle.images.length) {
+      for (const image of vehicle.images) {
+        const publicId = image.split('/').pop().split('.')[0];
+        await cloudinary.uploader.destroy(`vehicle_files/${publicId}`);
       }
     }
     if (vehicle.insuranceImage) {
       const publicId = vehicle.insuranceImage.split('/').pop().split('.')[0];
-      await cloudinary.uploader.destroy(publicId);
+      await cloudinary.uploader.destroy(`vehicle_files/${publicId}`);
     }
 
     await Vehicle.findByIdAndDelete(req.params.id);
-    res.json({ msg: 'Vehicle deleted successfully' });
+    res.json({ msg: 'Vehicle deleted' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });
@@ -144,10 +125,67 @@ exports.rateVehicle = async (req, res) => {
     const vehicle = await Vehicle.findById(req.params.id);
     if (!vehicle) return res.status(404).json({ msg: 'Vehicle not found' });
 
-    vehicle.rating = (vehicle.rating + rating) / 2;
+    vehicle.rating = vehicle.rating ? (vehicle.rating + rating) / 2 : rating;
     await vehicle.save();
     res.json({ msg: 'Vehicle rated', vehicle });
   } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+exports.getOwnerVehicleReviews = async (req, res) => {
+  try {
+    const vehicles = await Vehicle.find({ owner: req.user.id }).select('model rating');
+    if (!vehicles.length) return res.status(404).json({ msg: 'No vehicles found' });
+
+    const reviews = vehicles.map(vehicle => ({
+      vehicleId: vehicle._id,
+      model: vehicle.model,
+      rating: vehicle.rating || 'Not rated yet',
+    }));
+
+    res.json({ msg: 'Vehicle reviews retrieved', reviews });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+exports.approveVehicle = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ msg: 'Not authorized' });
+
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) return res.status(404).json({ msg: 'Vehicle not found' });
+
+    vehicle.isApproved = true;
+    vehicle.rejectionReason = null;
+    await vehicle.save();
+
+    res.json({ msg: 'Vehicle approved', vehicle });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+exports.rejectVehicle = async (req, res) => {
+  const { reason } = req.body;
+
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ msg: 'Not authorized' });
+
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) return res.status(404).json({ msg: 'Vehicle not found' });
+
+    vehicle.isApproved = false;
+    vehicle.rejectionReason = reason || 'No reason provided';
+    await vehicle.save();
+
+    res.json({ msg: 'Vehicle rejected', vehicle });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };

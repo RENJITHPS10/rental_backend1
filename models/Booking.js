@@ -9,10 +9,16 @@ const bookingSchema = new mongoose.Schema({
   pickupLocation: { type: String, required: true },
   dropLocation: { type: String, required: true },
   totalPrice: { type: Number, required: true },
-  status: { type: String, enum: ['pending', 'confirmed', 'completed', 'cancelled'], default: 'pending' },
   needsDriver: { type: Boolean, default: true },
+  status: { type: String, enum: ['pending', 'confirmed', 'completed', 'cancelled'], default: 'pending' },
+  ownerApproved: { type: Boolean, default: false },
   driverConfirmed: { type: Boolean, default: false },
-  ownerApproved: { type: Boolean, default: true },
+  rating: { type: Number, min: 1, max: 5, default: null },
+  currentLocation: {
+    latitude: Number,
+    longitude: Number,
+    updatedAt: Date,
+  },
 });
 
 module.exports = mongoose.model('Booking', bookingSchema);

@@ -9,7 +9,6 @@ const userSchema = new mongoose.Schema({
   license: { type: String },
   licenseVerified: { type: Boolean, default: false },
   isSuspended: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now },
 });
 
 module.exports = mongoose.model('User', userSchema);

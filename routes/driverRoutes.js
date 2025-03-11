@@ -1,14 +1,29 @@
 const express = require('express');
 const router = express.Router();
-const { assignDriver, completePickupDrop, reportCondition, getEarnings, rateDriver, getCarLocation } = require('../controllers/driverController');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/cloudinary');
+const {
+  assignDriver,
+  confirmDriverAssignment,
+  completePickupDrop,
+  reportCondition,
+  getEarnings,
+  rateDriver,
+  getCarLocation,
+  updateCarLocation,
+  getDriverBookings,
+  getDriverReviews,
+} = require('../controllers/driverController');
 
-router.post('/assign/:bookingId', auth, assignDriver);
-router.put('/complete/:bookingId', auth, completePickupDrop);
-router.put('/condition/:bookingId', auth, upload.array('images', 5), reportCondition);
+router.post('/:bookingId/assign', auth, assignDriver);
+router.post('/:bookingId/confirm', auth, confirmDriverAssignment);
+router.post('/:bookingId/complete', auth, completePickupDrop);
+router.post('/:bookingId/report', auth, upload.array('images', 10), reportCondition);
 router.get('/earnings', auth, getEarnings);
-router.post('/rate/:bookingId', auth, rateDriver);
-router.get('/location/:bookingId', auth, getCarLocation);
+router.post('/:bookingId/rate', auth, rateDriver);
+router.get('/:bookingId/location', auth, getCarLocation);
+router.put('/:bookingId/location', auth, updateCarLocation);
+router.get('/bookings', auth, getDriverBookings);
+router.get('/reviews', auth, getDriverReviews);
 
 module.exports = router;

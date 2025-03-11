@@ -5,11 +5,7 @@ exports.getOwnerEarnings = async (req, res) => {
   try {
     if (req.user.role !== 'owner') return res.status(403).json({ msg: 'Not authorized' });
 
-    const bookings = await Booking.find()
-      .populate('vehicle')
-      .where('vehicle.owner')
-      .equals(req.user.id);
-
+    const bookings = await Booking.find().populate('vehicle').where('vehicle.owner').equals(req.user.id);
     const payments = await Payment.find({ status: 'completed' }).populate('booking');
     const earnings = payments
       .filter(p => p.booking.vehicle.owner.toString() === req.user.id)
@@ -30,6 +26,7 @@ exports.getOwnerEarnings = async (req, res) => {
       details: earningsDetails,
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };

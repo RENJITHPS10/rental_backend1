@@ -1,8 +1,6 @@
 const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
-const Driver = require('../models/Driver');
 const ConditionReport = require('../models/ConditionReport');
-const cloudinary = require('cloudinary').v2;
 
 exports.createBooking = async (req, res) => {
   const { vehicleId, startDate, endDate, pickupLocation, dropLocation, needsDriver } = req.body;
@@ -35,6 +33,7 @@ exports.createBooking = async (req, res) => {
 
     res.json({ msg: 'Booking created', booking });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
@@ -56,6 +55,7 @@ exports.getBookings = async (req, res) => {
     ]);
     res.json(bookings);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
@@ -63,13 +63,10 @@ exports.getBookings = async (req, res) => {
 exports.cancelBooking = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ msg: 'Booking not found' });
-    if (booking.customer.toString() !== req.user.id) {
+    if (!booking || booking.customer.toString() !== req.user.id) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
-    if (booking.status === 'cancelled') {
-      return res.status(400).json({ msg: 'Booking already cancelled' });
-    }
+    if (booking.status === 'cancelled') return res.status(400).json({ msg: 'Booking already cancelled' });
 
     booking.status = 'cancelled';
     const vehicle = await Vehicle.findById(booking.vehicle);
@@ -79,21 +76,20 @@ exports.cancelBooking = async (req, res) => {
 
     res.json({ msg: 'Booking cancelled', booking });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
 
 exports.confirmDriver = async (req, res) => {
-  const { id } = req.params;
   const { confirm } = req.body;
 
   try {
-    const booking = await Booking.findById(id);
-    if (!booking) return res.status(404).json({ msg: 'Booking not found' });
-    if (booking.customer.toString() !== req.user.id) {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking || booking.customer.toString() !== req.user.id) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
-    if (!booking.driver) return res.status(400).json({ msg: 'No driver assigned yet' });
+    if (!booking.driver) return res.status(400).json({ msg: 'No driver assigned' });
     if (booking.driverConfirmed) return res.status(400).json({ msg: 'Driver already confirmed' });
 
     if (confirm) {
@@ -108,32 +104,30 @@ exports.confirmDriver = async (req, res) => {
 
     res.json({ msg: confirm ? 'Driver confirmed' : 'Driver rejected', booking });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
 
 exports.updateConditionReport = async (req, res) => {
-  const { id } = req.params;
   const { conditionBefore, conditionAfter } = req.body;
 
   try {
-    const booking = await Booking.findById(id);
+    const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ msg: 'Booking not found' });
 
     const isCustomer = booking.customer.toString() === req.user.id;
-    const isOwner = (await Vehicle.findById(booking.vehicle)).owner.toString() === req.user.id;
+    const vehicle = await Vehicle.findById(booking.vehicle);
+    const isOwner = vehicle.owner.toString() === req.user.id;
     if (!isCustomer && !isOwner) return res.status(403).json({ msg: 'Not authorized' });
 
     let images = [];
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const result = await cloudinary.uploader.upload(file.path);
-        images.push(result.secure_url);
-      }
+    if (req.files && req.files.length) {
+      images = req.files.map(file => file.path); // Cloudinary URLs
     }
 
     const report = new ConditionReport({
-      booking: id,
+      booking: req.params.id,
       reportedBy: req.user.id,
       conditionBefore,
       conditionAfter,
@@ -143,18 +137,19 @@ exports.updateConditionReport = async (req, res) => {
 
     res.json({ msg: 'Condition report submitted', report });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
 
 exports.approveBooking = async (req, res) => {
-  const { id } = req.params;
   const { approve } = req.body;
 
   try {
-    const booking = await Booking.findById(id).populate('vehicle');
-    if (!booking) return res.status(404).json({ msg: 'Booking not found' });
-    if (booking.vehicle.owner.toString() !== req.user.id) return res.status(403).json({ msg: 'Not authorized' });
+    const booking = await Booking.findById(req.params.id).populate('vehicle');
+    if (!booking || booking.vehicle.owner.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
 
     booking.ownerApproved = approve;
     if (!approve) {
@@ -167,6 +162,7 @@ exports.approveBooking = async (req, res) => {
 
     res.json({ msg: approve ? 'Booking approved' : 'Booking declined', booking });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 };
