@@ -11,7 +11,7 @@ const {
   rateVehicle,
   getOwnerVehicleReviews,
   approveVehicle,
-  rejectVehicle,
+  rejectVehicle,getVehicle
 } = require('../controllers/vehicleController');
 
 router.post('/add', auth, upload.fields([{ name: 'images', maxCount: 10 }, { name: 'insuranceImage', maxCount: 1 }]), addVehicle);
@@ -23,5 +23,6 @@ router.post('/:id/rate', auth, rateVehicle);
 router.get('/owner/reviews', auth, getOwnerVehicleReviews);
 router.put('/:id/approve', auth, approveVehicle);
 router.put('/:id/reject', auth, rejectVehicle);
+router.get('/:id', auth, getVehicle);
 
 module.exports = router;

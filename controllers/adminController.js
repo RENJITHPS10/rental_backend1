@@ -91,3 +91,20 @@ exports.suspendUser = async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 };
+exports.getVehiclesforapprove = async (req, res) => {
+  try {
+    // Ensure only admins can access this endpoint
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ msg: 'Unauthorized: Admins only' });
+    }
+
+    // Query for unapproved vehicles only
+    const query = { isApproved: false };
+
+    const vehicles = await Vehicle.find(query).populate('owner', 'name');
+    res.json(vehicles);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};

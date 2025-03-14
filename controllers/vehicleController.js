@@ -1,17 +1,42 @@
 const Vehicle = require('../models/Vehicle');
 
 exports.addVehicle = async (req, res) => {
-  const { type, category, model, fuelType, seatingCapacity, price, location, registration } = req.body;
+  const {
+    type,
+    category,
+    model,
+    fuelType,
+    seatingCapacity,
+    price,
+    location,
+    registration,
+  } = req.body;
 
   try {
+    // Basic validation
+    if (!type || !model || !fuelType || !price || !registration) {
+      return res.status(400).json({ msg: 'Missing required fields' });
+    }
+
     const existingVehicle = await Vehicle.findOne({ registration });
-    if (existingVehicle) return res.status(400).json({ msg: 'Vehicle already exists' });
+    if (existingVehicle) {
+      return res.status(400).json({ msg: 'Vehicle already exists' });
+    }
 
     let images = [];
     if (req.files && req.files['images']) {
-      images = req.files['images'].map(file => file.path); // Cloudinary URLs
+      images = Array.isArray(req.files['images'])
+        ? req.files['images'].map((file) => file.path)
+        : [req.files['images'].path]; // Handle single or multiple files
     }
-    const insuranceImage = req.files['insuranceImage'] ? req.files['insuranceImage'][0].path : null;
+
+    const insuranceImage = req.files && req.files['insuranceImage']
+      ? req.files['insuranceImage'][0].path
+      : null;
+
+    if (!insuranceImage) {
+      return res.status(400).json({ msg: 'Insurance image is required' });
+    }
 
     const vehicle = new Vehicle({
       owner: req.user.id,
@@ -19,13 +44,14 @@ exports.addVehicle = async (req, res) => {
       category,
       model,
       fuelType,
-      seatingCapacity,
-      price,
+      seatingCapacity: Number(seatingCapacity), // Ensure it's a number
+      price: Number(price), // Ensure it's a number
       location,
       registration,
       insuranceImage,
       images,
     });
+
     await vehicle.save();
     res.status(201).json({ msg: 'Vehicle added', vehicle });
   } catch (err) {
@@ -33,7 +59,6 @@ exports.addVehicle = async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 };
-
 exports.getVehicles = async (req, res) => {
   try {
     const { location, priceMax, type, fuelType, all } = req.query;
@@ -137,15 +162,18 @@ exports.rateVehicle = async (req, res) => {
 exports.getOwnerVehicleReviews = async (req, res) => {
   try {
     const vehicles = await Vehicle.find({ owner: req.user.id }).select('model rating');
-    if (!vehicles.length) return res.status(404).json({ msg: 'No vehicles found' });
+    if (!vehicles.length) {
+      return res.status(404).json([]); // Return empty array instead of error
+    }
 
-    const reviews = vehicles.map(vehicle => ({
-      vehicleId: vehicle._id,
-      model: vehicle.model,
-      rating: vehicle.rating || 'Not rated yet',
+    const reviews = vehicles.map((vehicle) => ({
+      _id: vehicle._id, // Use _id for consistency with frontend
+      vehicle: { model: vehicle.model }, // Match frontend structure
+      vehicleRating: vehicle.rating || 0, // Default to 0 if not rated
+      vehicleComment: 'Not rated yet', // Placeholder if no comment exists
     }));
 
-    res.json({ msg: 'Vehicle reviews retrieved', reviews });
+    res.json(reviews); // Return array directly
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });
@@ -184,6 +212,27 @@ exports.rejectVehicle = async (req, res) => {
     await vehicle.save();
 
     res.json({ msg: 'Vehicle rejected', vehicle });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+exports.getVehicle = async (req, res) => {
+  try {
+    const vehicle = await Vehicle.findById(req.params.id).populate('owner', 'name');
+    if (!vehicle) {
+      return res.status(404).json({ msg: 'Vehicle not found' });
+    }
+
+    // Optionally restrict access (e.g., only admins, owners, or authenticated users can view)
+    if (req.user.role !== 'admin' && vehicle.owner.toString() !== req.user.id) {
+      // Check if the vehicle is available and approved for non-owners/admins
+      if (!vehicle.availability || !vehicle.isApproved) {
+        return res.status(403).json({ msg: 'Vehicle not available or not approved' });
+      }
+    }
+
+    res.json(vehicle);
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });
