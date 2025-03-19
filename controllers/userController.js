@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const Driver = require('../models/Driver');
+
 
 exports.registerUser = async (req, res) => {
   const { name, email, password, role, mobile } = req.body;
@@ -10,13 +12,21 @@ exports.registerUser = async (req, res) => {
     if (user) return res.status(400).json({ msg: 'User already exists' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    let license = null;
-    if ((role === 'driver' || role === 'customer') && req.file) {
-      license = req.file.path; // Cloudinary URL
+
+    if ((role === 'customer' || role === 'driver') && !req.file) {
+      return res.status(400).json({ msg: 'License is required for customers and drivers' });
     }
+
+    let license = req.file ? req.file.path : null;
 
     user = new User({ name, email, password: hashedPassword, role, mobile, license });
     await user.save();
+
+    // Create Driver document if role is 'driver'
+    if (role === 'driver') {
+      const driver = new Driver({ user: user._id });
+      await driver.save();
+    }
 
     const payload = { user: { id: user.id, role: user.role } };
     const token = jwt.sign(payload, process.env.JWT_SECRET);
@@ -28,6 +38,8 @@ exports.registerUser = async (req, res) => {
   }
 };
 
+
+
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
 
@@ -36,7 +48,14 @@ exports.loginUser = async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(400).json({ msg: 'Invalid credentials' });
     }
-    if (user.isSuspended) return res.status(403).json({ msg: 'Account suspended' });
+    if (user.isSuspended) {
+      return res.status(403).json({ msg: 'Account suspended' });
+    }
+
+    // Check license verification for customer and driver roles
+    if ((user.role === 'customer' || user.role === 'driver') && !user.licenseVerified) {
+      return res.status(403).json({ msg: 'License not verified. Please wait for admin approval.' });
+    }
 
     const payload = { user: { id: user.id, role: user.role } };
     const token = jwt.sign(payload, process.env.JWT_SECRET);
@@ -57,7 +76,7 @@ exports.updateProfile = async (req, res) => {
 
     user.name = name || user.name;
     user.mobile = mobile || user.mobile;
-    if (req.file) user.license = req.file.path; // Cloudinary URL
+    if (req.file) user.license = req.file.path;
 
     await user.save();
     res.json({ msg: 'Profile updated', user });
@@ -82,3 +101,4 @@ exports.getLicenseStatus = async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 };
+

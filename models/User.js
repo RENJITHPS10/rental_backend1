@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
   license: { type: String },
   licenseVerified: { type: Boolean, default: false },
   isSuspended: { type: Boolean, default: false },
+
 });
 
 module.exports = mongoose.model('User', userSchema);

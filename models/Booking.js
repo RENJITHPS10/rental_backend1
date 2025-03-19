@@ -10,6 +10,7 @@ const bookingSchema = new mongoose.Schema({
   dropLocation: { type: String, required: true },
   totalPrice: { type: Number, required: true },
   needsDriver: { type: Boolean, default: true },
+  driverFee: { type: Number, default: 0 }, // Added for driver payment
   status: { type: String, enum: ['pending', 'approved', 'completed', 'cancelled'], default: 'pending' },
   ownerApproved: { type: Boolean, default: false },
   driverConfirmed: { type: Boolean, default: false },

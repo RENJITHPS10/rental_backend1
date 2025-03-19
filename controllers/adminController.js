@@ -108,3 +108,41 @@ exports.getVehiclesforapprove = async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 };
+exports.getUnverifiedUsers = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ msg: 'Only admins can view unverified users' });
+    }
+
+    const users = await User.find({ licenseVerified: false, license: { $ne: null } })
+      .select('name email role license licenseVerified');
+    res.json(users);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+exports.verifyUserLicense = async (req, res) => {
+  const { userId } = req.params;
+  const { approve } = req.body;
+
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ msg: 'Only admins can verify licenses' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+
+    user.licenseVerified = approve;
+    await user.save();
+
+    res.json({ msg: approve ? 'License approved' : 'License rejected', user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};

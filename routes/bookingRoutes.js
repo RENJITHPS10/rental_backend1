@@ -9,13 +9,15 @@ const {
   confirmDriver,
   updateConditionReport,
   approveBooking,
+  getBookingById,
 } = require('../controllers/bookingController');
 
 router.post('/', auth, createBooking);
 router.get('/', auth, getBookings);
-router.put('/:id/cancel', auth, cancelBooking);
-router.put('/:id/confirm-driver', auth, confirmDriver);
-router.post('/:id/condition-report', auth, upload.array('images', 10), updateConditionReport);
+router.delete('/:id', auth, cancelBooking);
+router.put('/:id/driver', auth, confirmDriver);
+router.post('/:id/report', auth, upload.array('images', 10), updateConditionReport);
 router.put('/:id/approve', auth, approveBooking);
+router.get('/:id', auth, getBookingById);
 
 module.exports = router;

@@ -12,7 +12,7 @@ const {
   getCarLocation,
   updateCarLocation,
   getDriverBookings,
-  getDriverReviews,
+  getDriverReviews,getAvailableDrivers,updateDriver,getDriverProfile
 } = require('../controllers/driverController');
 
 router.post('/:bookingId/assign', auth, assignDriver);
@@ -25,5 +25,7 @@ router.get('/:bookingId/location', auth, getCarLocation);
 router.put('/:bookingId/location', auth, updateCarLocation);
 router.get('/bookings', auth, getDriverBookings);
 router.get('/reviews', auth, getDriverReviews);
-
+router.get('/available', auth, getAvailableDrivers); // Added
+router.put('/:driverId', auth, updateDriver); // New route
+router.get('/profile', auth, getDriverProfile); // Add this line
 module.exports = router;
