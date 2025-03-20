@@ -14,7 +14,7 @@ const {
   rejectVehicle,getVehicle
 } = require('../controllers/vehicleController');
 
-router.post('/add', auth, upload.fields([{ name: 'images', maxCount: 10 }, { name: 'insuranceImage', maxCount: 1 }]), addVehicle);
+router.post('/add', auth, upload.fields([{ name: 'images', maxCount: 10 }, { name: 'insuranceImage', maxCount: 1 },{ name: 'pollutionImage', maxCount: 1 }]), addVehicle);
 router.get('/', getVehicles);
 router.get('/owner', auth, getOwnerVehicles);
 router.put('/:id', auth, upload.fields([{ name: 'images', maxCount: 10 }, { name: 'insuranceImage', maxCount: 1 }]), updateVehicle);

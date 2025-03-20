@@ -11,6 +11,7 @@ const vehicleSchema = new mongoose.Schema({
   location: { type: String, required: true },
   registration: { type: String, required: true, unique: true },
   insuranceImage: { type: String },
+  pollutionImage: { type: String }, // New field for pollution certificate image
   images: [{ type: String }],
   availability: { type: Boolean, default: true },
   isApproved: { type: Boolean, default: false },

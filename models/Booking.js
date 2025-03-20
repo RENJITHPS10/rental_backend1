@@ -10,10 +10,14 @@ const bookingSchema = new mongoose.Schema({
   dropLocation: { type: String, required: true },
   totalPrice: { type: Number, required: true },
   needsDriver: { type: Boolean, default: true },
-  driverFee: { type: Number, default: 0 }, // Added for driver payment
-  status: { type: String, enum: ['pending', 'approved', 'completed', 'cancelled'], default: 'pending' },
+  driverFee: { type: Number, default: 0 },
+  status: { 
+    type: String, 
+    enum: ['pending', 'approved', 'assigned', 'pickup-confirmed', 'completed', 'cancelled'], 
+    default: 'pending' 
+  }, // Updated statuses
   ownerApproved: { type: Boolean, default: false },
-  driverConfirmed: { type: Boolean, default: false },
+  driverConfirmed: { type: Boolean, default: false }, // Represents pickup readiness
   rating: { type: Number, min: 1, max: 5, default: null },
   currentLocation: {
     latitude: Number,

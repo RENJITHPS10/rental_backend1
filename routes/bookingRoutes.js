@@ -9,7 +9,7 @@ const {
   confirmDriver,
   updateConditionReport,
   approveBooking,
-  getBookingById,
+  getBookingById,cancelDriverRequest
 } = require('../controllers/bookingController');
 
 router.post('/', auth, createBooking);
@@ -19,5 +19,7 @@ router.put('/:id/driver', auth, confirmDriver);
 router.post('/:id/report', auth, upload.array('images', 10), updateConditionReport);
 router.put('/:id/approve', auth, approveBooking);
 router.get('/:id', auth, getBookingById);
+router.put('/:bookingId/cancel-driver', auth, cancelDriverRequest);
+
 
 module.exports = router;

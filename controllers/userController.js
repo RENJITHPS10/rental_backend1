@@ -53,8 +53,15 @@ exports.loginUser = async (req, res) => {
     }
 
     // Check license verification for customer and driver roles
-    if ((user.role === 'customer' || user.role === 'driver') && !user.licenseVerified) {
-      return res.status(403).json({ msg: 'License not verified. Please wait for admin approval.' });
+    if (user.role === 'customer' || user.role === 'driver') {
+      if (user.licenseStatus === 'pending') {
+        return res.status(403).json({ msg: 'License not verified. Please wait for admin approval.' });
+      }
+      if (user.licenseStatus === 'rejected') {
+        return res.status(403).json({ 
+          msg: `License rejected. Reason: ${user.licenseRejectionReason || 'No reason provided'}` 
+        });
+      }
     }
 
     const payload = { user: { id: user.id, role: user.role } };
@@ -65,7 +72,8 @@ exports.loginUser = async (req, res) => {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
-};
+}
+
 
 exports.updateProfile = async (req, res) => {
   const { name, mobile } = req.body;

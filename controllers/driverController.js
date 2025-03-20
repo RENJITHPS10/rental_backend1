@@ -16,12 +16,15 @@ exports.assignDriver = async (req, res) => {
     }
 
     // Validate driver
-    const driver = await Driver.findOne({ user: driverId });
+    const driver = await Driver.findOne({ user: driverId }).populate('user');
     if (!driver) {
       return res.status(404).json({ msg: 'Driver not found' });
     }
     if (!driver.availability) {
-      return res.status(400).json({ msg: 'Driver is unavailable' });
+      return res.status(400).json({ msg: 'Driver is currently unavailable' });
+    }
+    if (driver.user.role !== 'driver') {
+      return res.status(400).json({ msg: 'Selected user is not a driver' });
     }
 
     // Validate booking
@@ -33,21 +36,31 @@ exports.assignDriver = async (req, res) => {
       return res.status(400).json({ msg: 'Booking does not require a driver' });
     }
     if (booking.driver) {
-      return res.status(400).json({ msg: 'Driver already assigned to this booking' });
+      return res.status(400).json({ msg: 'A driver is already assigned to this booking' });
     }
     if (booking.status !== 'approved' || !booking.ownerApproved) {
-      return res.status(400).json({ msg: 'Booking not eligible (must be confirmed and owner-approved)' });
+      return res.status(400).json({ msg: 'Booking must be approved by owner first' });
     }
 
-    // Assign driver
+    // Assign driver and update status
     booking.driver = driverId;
+    booking.status = 'assigned'; // Set status to 'assigned'
     driver.availability = false;
 
     // Save changes
-    await booking.save();
-    await driver.save();
+    await Promise.all([booking.save(), driver.save()]); // Save both in parallel
 
-    res.json({ msg: 'Driver assigned successfully', booking });
+    res.status(200).json({ 
+      msg: 'Driver assigned successfully', 
+      booking: {
+        _id: booking._id,
+        vehicle: booking.vehicle,
+        driver: driverId,
+        status: booking.status,
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });
@@ -56,12 +69,26 @@ exports.assignDriver = async (req, res) => {
 exports.confirmDriverAssignment = async (req, res) => {
   try {
     const driver = await Driver.findOne({ user: req.user.id });
-    if (!driver || req.user.role !== 'driver') return res.status(403).json({ msg: 'Not a driver' });
+    if (!driver || req.user.role !== 'driver') {
+      return res.status(403).json({ msg: 'Not authorized as a driver' });
+    }
+
     const booking = await Booking.findById(req.params.bookingId);
-    if (!booking || booking.driver?.toString() !== req.user.id || booking.driverConfirmed) return res.status(400).json({ msg: 'Booking not eligible' });
+    if (!booking) {
+      return res.status(404).json({ msg: 'Booking not found' });
+    }
+    if (booking.driver?.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'Not assigned to this booking' });
+    }
+    if (booking.status !== 'assigned' || booking.driverConfirmed) {
+      return res.status(400).json({ msg: 'Booking not eligible for confirmation' });
+    }
+
     booking.driverConfirmed = true;
+    booking.status = 'confirmed'; // Transition to confirmed
     await booking.save();
-    res.json({ msg: 'Driver assignment confirmed', booking });
+
+    res.json({ msg: 'Driver readiness confirmed', booking });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });
@@ -206,12 +233,23 @@ exports.updateCarLocation = async (req, res) => {
 
 exports.getDriverBookings = async (req, res) => {
   try {
-    const driver = await Driver.findOne({ user: req.user.id });
-    if (!driver || req.user.role !== 'driver') return res.status(403).json({ msg: 'Not a driver' });
-
     const bookings = await Booking.find({ driver: req.user.id })
-      .populate('vehicle', 'model')
-      .populate('customer', 'name');
+      .populate({
+        path: 'customer',
+        select: 'name email phone', // Fetch customer name, email, phone
+      })
+      .populate({
+        path: 'vehicle',
+        populate: {
+          path: 'owner',
+          select: 'name email phone', // Fetch owner name, email, phone
+        },
+      });
+
+    if (!bookings || bookings.length === 0) {
+      return res.status(404).json({ msg: 'No bookings found for this driver' });
+    }
+
     res.json(bookings);
   } catch (err) {
     console.error(err);
@@ -329,6 +367,37 @@ exports.updateDriver = async (req, res) => {
     await driver.save();
 
     res.json({ msg: 'Driver updated successfully', driver });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+exports.confirmDriverPickupReadiness = async (req, res) => {
+
+
+  try {
+    const driver = await Driver.findOne({ user: req.user.id });
+   
+    if (!driver || req.user.role !== 'driver') {
+      return res.status(403).json({ msg: 'Not authorized as a driver' });
+    }
+
+    const booking = await Booking.findById(req.params.bookingId);
+    if (!booking) {
+      return res.status(404).json({ msg: 'Booking not found' });
+    }
+    if (booking.driver?.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'Not assigned to this booking' });
+    }
+    if (booking.status !== 'assigned' || booking.driverConfirmed) {
+      return res.status(400).json({ msg: 'Cannot confirm pickup readiness at this stage' });
+    }
+
+    booking.driverConfirmed = true; // Driver confirms readiness for pickup
+    booking.status = 'pickup-confirmed'; // Transition to pickup-confirmed
+    await booking.save();
+
+    res.json({ msg: 'Pickup readiness confirmed', booking });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });

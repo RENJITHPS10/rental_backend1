@@ -1,53 +1,57 @@
+const mongoose = require('mongoose');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 const Driver = require('../models/Driver');
 const { calculateDistance } = require('../utils/calculateDistance');
 
-
-
 exports.createPayment = async (req, res) => {
-  const { bookingId, paymentMethodId } = req.body;
+  const { paymentMethodId } = req.body; // No need for bookingId in body
+  const { bookingId } = req.params; // Use URL param
+
+  console.log('Booking ID:', bookingId, 'Payment Method ID:', paymentMethodId);
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
   try {
-    const booking = await Booking.findById(bookingId).populate({
-      path: 'vehicle',
-      populate: { path: 'owner', select: '_id' }, // Only need owner ID
-    }).populate('driver');
+    const booking = await Booking.findById(bookingId)
+      .populate({
+        path: 'vehicle',
+        populate: { path: 'owner', select: '_id' },
+      })
+      .populate('driver') // Populate driver if User ref
+      .session(session);
 
     if (!booking) {
+      await session.abortTransaction();
       return res.status(404).json({ msg: 'Booking not found' });
     }
     if (booking.customer.toString() !== req.user.id) {
+      await session.abortTransaction();
       return res.status(403).json({ msg: 'Not authorized' });
     }
-    if (booking.status !== 'confirmed') {
-      return res.status(400).json({ msg: 'Booking not confirmed' });
+    if (booking.status !== 'approved') {
+      await session.abortTransaction();
+      return res.status(400).json({ msg: 'Booking not approved' });
     }
 
-    // Calculate driver fee (distance-based)
     let driverFee = 0;
     if (booking.needsDriver && booking.driver) {
       const distance = await calculateDistance(booking.pickupLocation, booking.dropLocation);
-      driverFee = distance * 0.50; // $0.50 per km
+      driverFee = distance ? distance * 0.50 : 0;
       booking.driverFee = driverFee;
     }
 
     const ownerAmount = booking.totalPrice - driverFee;
 
-    // Create Payment Intent (all money goes to platform/admin account)
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: booking.totalPrice * 100, // Total in cents
+      amount: Math.round(booking.totalPrice * 100),
       currency: 'usd',
       payment_method: paymentMethodId,
-      confirmation_method: 'manual',
       confirm: true,
-      return_url: 'http://localhost:3000/payment-success',
-      // No transfer_data; funds stay in platform account
     });
 
-    // Save payment details
     const payment = new Payment({
       booking: bookingId,
       amount: booking.totalPrice,
@@ -55,36 +59,44 @@ exports.createPayment = async (req, res) => {
       status: paymentIntent.status === 'succeeded' ? 'completed' : 'pending',
       customerId: booking.customer,
       ownerId: booking.vehicle.owner._id,
-      driverId: booking.driver ? booking.driver._id : null,
+      driverId: booking.driver ? booking.driver._id : null, // Adjust if driver is User ID
       driverFee,
       ownerAmount,
     });
-    await payment.save();
+
+    await payment.save({ session });
 
     if (paymentIntent.status === 'succeeded') {
       booking.status = 'completed';
-      await booking.save();
+      await booking.save({ session });
 
       if (booking.needsDriver && booking.driver) {
         await Driver.findOneAndUpdate(
-          { user: booking.driver },
-          { $inc: { earnings: driverFee, totalTrips: 1 } }
+          { user: booking.driver }, // Assuming driver in Booking is User ID
+          { $inc: { earnings: driverFee, totalTrips: 1 } },
+          { session }
         );
       }
     }
 
+    await session.commitTransaction();
     res.json({
       msg: 'Payment processed',
       paymentIntentId: paymentIntent.id,
       status: paymentIntent.status,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Payment error', error: err.message });
+    await session.abortTransaction();
+    console.error('Payment error:', err.stack);
+    if (err instanceof stripe.errors.StripeError) {
+      return res.status(400).json({ msg: 'Payment failed', error: err.message });
+    }
+    res.status(500).json({ msg: 'Server error', error: err.message });
+  } finally {
+    session.endSession();
   }
 };
 
-// Optional: Endpoint for admin to view all payments
 exports.getAllPayments = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -94,12 +106,11 @@ exports.getAllPayments = async (req, res) => {
     const payments = await Payment.find()
       .populate('customerId', 'name email')
       .populate('ownerId', 'name email')
-      .populate('driverId', 'name email')
+      .populate('driverId', 'name email') // Assumes driverId is User ref
       .populate('booking', 'totalPrice pickupLocation dropLocation');
     res.json(payments);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
+    console.error('Error in getAllPayments:', err.stack);
+    res.status(500).json({ msg: 'Server error', error: err.message });
   }
 };
-

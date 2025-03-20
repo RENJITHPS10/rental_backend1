@@ -210,3 +210,22 @@ exports.getBookingById = async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 };
+exports.cancelDriverRequest = async (req, res) => {
+  const { bookingId } = req.params;
+
+  try {
+    const booking = await Booking.findById(bookingId);
+    if (!booking) return res.status(404).json({ msg: 'Booking not found' });
+    if (booking.customer.toString() !== req.user.id) return res.status(403).json({ msg: 'Not authorized' });
+    if (booking.status !== 'approved') return res.status(400).json({ msg: 'Booking must be approved' });
+    if (!booking.needsDriver || booking.driver) return res.status(400).json({ msg: 'No driver request to cancel' });
+
+    booking.needsDriver = false; // Cancel the driver request
+    await booking.save();
+
+    res.json({ msg: 'Driver request cancelled', booking });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};

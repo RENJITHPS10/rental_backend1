@@ -1,5 +1,5 @@
 const Vehicle = require('../models/Vehicle');
-
+const cloudinary = require('cloudinary').v2;
 exports.addVehicle = async (req, res) => {
   const {
     type,
@@ -23,13 +23,15 @@ exports.addVehicle = async (req, res) => {
       return res.status(400).json({ msg: 'Vehicle already exists' });
     }
 
+    // Handle vehicle images (max 10)
     let images = [];
     if (req.files && req.files['images']) {
       images = Array.isArray(req.files['images'])
         ? req.files['images'].map((file) => file.path)
-        : [req.files['images'].path]; // Handle single or multiple files
+        : [req.files['images'].path];
     }
 
+    // Handle insurance image (max 1)
     const insuranceImage = req.files && req.files['insuranceImage']
       ? req.files['insuranceImage'][0].path
       : null;
@@ -38,17 +40,28 @@ exports.addVehicle = async (req, res) => {
       return res.status(400).json({ msg: 'Insurance image is required' });
     }
 
+    // Handle pollution image (max 1)
+    const pollutionImage = req.files && req.files['pollutionImage']
+      ? req.files['pollutionImage'][0].path
+      : null;
+
+    // Optional: Make pollutionImage required
+    if (!pollutionImage) {
+      return res.status(400).json({ msg: 'Pollution certificate image is required' });
+    }
+
     const vehicle = new Vehicle({
       owner: req.user.id,
       type,
       category,
       model,
       fuelType,
-      seatingCapacity: Number(seatingCapacity), // Ensure it's a number
-      price: Number(price), // Ensure it's a number
+      seatingCapacity: Number(seatingCapacity),
+      price: Number(price),
       location,
       registration,
       insuranceImage,
+      pollutionImage, // Add pollutionImage to the vehicle object
       images,
     });
 
@@ -116,7 +129,7 @@ exports.updateVehicle = async (req, res) => {
 };
 
 exports.deleteVehicle = async (req, res) => {
-  const cloudinary = require('../config/cloudinary');
+
 
   try {
     const vehicle = await Vehicle.findById(req.params.id);

@@ -61,9 +61,19 @@ exports.detectFraud = async (req, res) => {
 
 exports.getAllUsers = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') return res.status(403).json({ msg: 'Not authorized' });
+    // Restrict to admin only
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
 
-    const users = await User.find().select('-password');
+    // Fetch all users except those with role 'admin'
+    const users = await User.find({ role: { $ne: 'admin' } }).select('-password');
+
+    // Optional: Check if any users are found
+    if (!users || users.length === 0) {
+      return res.status(404).json({ msg: 'No non-admin users found' });
+    }
+
     res.json(users);
   } catch (err) {
     console.error(err);
@@ -125,7 +135,7 @@ exports.getUnverifiedUsers = async (req, res) => {
 
 exports.verifyUserLicense = async (req, res) => {
   const { userId } = req.params;
-  const { approve } = req.body;
+  const { approve, rejectionReason } = req.body; // Add rejectionReason
 
   try {
     if (req.user.role !== 'admin') {
@@ -137,10 +147,29 @@ exports.verifyUserLicense = async (req, res) => {
       return res.status(404).json({ msg: 'User not found' });
     }
 
-    user.licenseVerified = approve;
+    if (approve) {
+      user.licenseVerified = true;
+      user.licenseStatus = 'approved';
+      user.licenseRejectionReason = null; // Clear any previous reason
+    } else {
+      user.licenseVerified = false;
+      user.licenseStatus = 'rejected';
+      user.licenseRejectionReason = rejectionReason || 'No reason provided'; // Default if no reason given
+    }
+
     await user.save();
 
-    res.json({ msg: approve ? 'License approved' : 'License rejected', user });
+    res.json({ 
+      msg: approve ? 'License approved' : 'License rejected', 
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        licenseStatus: user.licenseStatus,
+        licenseRejectionReason: user.licenseRejectionReason,
+      },
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });
