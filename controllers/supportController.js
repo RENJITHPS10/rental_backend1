@@ -39,3 +39,16 @@ exports.resolveTicket = async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 };
+exports.getCustomerSupportTickets = async (req, res) => {
+  try {
+
+    const tickets = await Support.find({ user: req.user.id })
+      .sort({ createdAt: -1 })
+      .populate('customer', 'name email');
+    res.json({ tickets: tickets || [] });
+    console.log(tickets)
+  } catch (err) {
+    console.error('Error in getCustomerSupportTickets:', err.message);
+    res.status(500).json({ msg: 'Server error', tickets: [] });
+  }
+};

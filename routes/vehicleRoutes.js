@@ -25,4 +25,5 @@ router.put('/:id/approve', auth, approveVehicle);
 router.put('/:id/reject', auth, rejectVehicle);
 router.get('/:id', auth, getVehicle);
 
+
 module.exports = router;

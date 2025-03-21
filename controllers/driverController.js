@@ -116,23 +116,33 @@ exports.completePickupDrop = async (req, res) => {
 };
 
 exports.reportCondition = async (req, res) => {
-  const { conditionBefore, conditionAfter } = req.body;
+
+  const { condition, type } = req.body;
+  console.log(condition)
+  console.log(type)
   try {
-    const driver = await Driver.findOne({ user: req.user.id });
-    if (!driver || req.user.role !== 'driver') return res.status(403).json({ msg: 'Not a driver' });
     const booking = await Booking.findById(req.params.bookingId);
-    if (!booking || booking.driver?.toString() !== req.user.id) return res.status(404).json({ msg: 'Booking not found or not yours' });
-    let images = [];
-    if (req.files && req.files.length) images = req.files.map(file => file.path);
+    if (!booking || booking.driver.toString() !== req.user.id) {
+      return res.status(404).json({ msg: 'Booking not found or not yours' });
+    }
+    if (type === 'before' && booking.status !== 'pickup-confirmed') {
+      return res.status(400).json({ msg: 'Can only report "before" when assigned' });
+    }
+    if (type === 'after' && booking.status !== 'completed') {
+      return res.status(400).json({ msg: 'Can only report "after" after pickup confirmed' });
+    }
+    let images = req.files ? req.files.map(file => file.path) : [];
     const report = new ConditionReport({
       booking: req.params.bookingId,
       reportedBy: req.user.id,
-      conditionBefore,
-      conditionAfter,
+      type,
+      condition,
       images,
     });
     await report.save();
-    res.json({ msg: 'Condition reported', report });
+    booking.conditionReports.push(report._id);
+    await booking.save();
+    res.json({ msg: `Condition ${type} reported`, report });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });
@@ -236,13 +246,13 @@ exports.getDriverBookings = async (req, res) => {
     const bookings = await Booking.find({ driver: req.user.id })
       .populate({
         path: 'customer',
-        select: 'name email phone', // Fetch customer name, email, phone
+        select: 'name email mobile', // Fetch customer name, email, phone
       })
       .populate({
         path: 'vehicle',
         populate: {
           path: 'owner',
-          select: 'name email phone', // Fetch owner name, email, phone
+          select: 'name email mobile', // Fetch owner name, email, phone
         },
       });
 

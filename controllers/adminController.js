@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Vehicle = require('../models/Vehicle');
 const Booking = require('../models/Booking');
+const ConditionReport = require('../models/ConditionReport');
 
 exports.manageUser = async (req, res) => {
   const { id } = req.params;
@@ -172,6 +173,78 @@ exports.verifyUserLicense = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+exports.getConditionReports = async (req, res) => {
+  try {
+    const { bookingId } = req.query; // Optional query param to filter by booking
+
+    // Fetch all condition reports with populated fields
+    const reports = await ConditionReport.find(bookingId ? { booking: bookingId } : {})
+      .populate({
+        path: 'booking',
+        select: 'vehicle customer driver status pickupLocation dropLocation',
+        populate: [
+          { path: 'vehicle', select: 'model owner' },
+          { path: 'customer', select: 'name email mobile' },
+          { path: 'driver', select: 'name email mobile' },
+        ],
+      })
+      .populate('reportedBy', 'name email role');
+
+    if (!reports || reports.length === 0) {
+      return res.status(404).json({
+        msg: bookingId ? 'No condition reports found for this booking ID' : 'No condition reports found',
+      });
+    }
+
+    // Group reports by booking ID
+    const groupedReports = {};
+    reports.forEach((report) => {
+      const bookingIdStr = report.booking?._id.toString();
+      if (!bookingIdStr) return; // Skip if booking is not populated
+
+      if (!groupedReports[bookingIdStr]) {
+        groupedReports[bookingIdStr] = {
+          bookingId: bookingIdStr,
+          before: null,
+          after: null,
+          bookingDetails: {
+            vehicle: report.booking.vehicle || {},
+            customer: report.booking.customer || {},
+            driver: report.booking.driver || {},
+            status: report.booking.status || 'N/A',
+            pickupLocation: report.booking.pickupLocation || 'N/A',
+            dropLocation: report.booking.dropLocation || 'N/A',
+          },
+        };
+      }
+
+      const reportData = {
+        _id: report._id,
+        condition: report.condition,
+        images: report.images || [],
+        reportedBy: report.reportedBy || {},
+        createdAt: report.createdAt,
+      };
+
+      if (report.type === 'before') {
+        groupedReports[bookingIdStr].before = reportData;
+      } else if (report.type === 'after') {
+        groupedReports[bookingIdStr].after = reportData;
+      }
+    });
+
+    const result = Object.values(groupedReports);
+
+    if (bookingId && !mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ msg: 'Invalid booking ID' });
+    }
+
+    res.json({ reports: result });
+  } catch (err) {
+    console.error('Error in getConditionReports:', err.message);
     res.status(500).json({ msg: 'Server error' });
   }
 };

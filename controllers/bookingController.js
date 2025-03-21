@@ -197,7 +197,7 @@ exports.getBookingById = async (req, res) => {
     const booking = await Booking.findById(req.params.id)
       .populate('vehicle', 'model type category')
       .populate('customer', 'name');
-    console.log(booking);
+  
     if (!booking) {
       return res.status(404).json({ msg: 'Booking not found' });
     }
@@ -226,6 +226,26 @@ exports.cancelDriverRequest = async (req, res) => {
     res.json({ msg: 'Driver request cancelled', booking });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+exports.getBooking = async (req, res) => {
+
+  try {
+    const booking = await Booking.findById(req.params.bookingId)
+      .populate('conditionReports')
+      .populate('vehicle')
+      .populate('customer')
+      .populate('driver');
+
+    if (!booking || booking.driver._id.toString() !== req.user.id) {
+      return res.status(404).json({ msg: 'Booking not found or not yours' });
+    }
+  
+    res.json(booking);
+
+  } catch (err) {
+  
     res.status(500).json({ msg: 'Server error' });
   }
 };
