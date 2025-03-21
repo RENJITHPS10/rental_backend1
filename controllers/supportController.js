@@ -14,9 +14,12 @@ exports.createTicket = async (req, res) => {
 };
 
 exports.getTickets = async (req, res) => {
+
   try {
     if (req.user.role !== 'admin') return res.status(403).json({ msg: 'Not authorized' });
+
     const tickets = await Support.find().populate('user', 'name email');
+  
     res.json(tickets);
   } catch (err) {
     console.error(err);
@@ -44,7 +47,7 @@ exports.getCustomerSupportTickets = async (req, res) => {
 
     const tickets = await Support.find({ user: req.user.id })
       .sort({ createdAt: -1 })
-      .populate('customer', 'name email');
+      .populate('user', 'name email');
     res.json({ tickets: tickets || [] });
     console.log(tickets)
   } catch (err) {
