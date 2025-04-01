@@ -1,3 +1,4 @@
+const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
 const cloudinary = require('cloudinary').v2;
 exports.addVehicle = async (req, res) => {
@@ -158,9 +159,13 @@ exports.deleteVehicle = async (req, res) => {
 
 exports.rateVehicle = async (req, res) => {
   const { rating } = req.body;
-
   try {
-    const vehicle = await Vehicle.findById(req.params.id);
+    const booking = await Booking.findById(req.params.bookingId).populate('vehicle');
+    console.log('Booking:', booking);
+    if (!booking) return res.status(404).json({ msg: 'Booking not found' });
+
+    const vehicle = booking.vehicle;
+    console.log('Vehicle:', vehicle);
     if (!vehicle) return res.status(404).json({ msg: 'Vehicle not found' });
 
     vehicle.rating = vehicle.rating ? (vehicle.rating + rating) / 2 : rating;

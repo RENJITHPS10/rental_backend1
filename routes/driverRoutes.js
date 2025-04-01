@@ -19,7 +19,7 @@ router.post('/:bookingId/assign', auth, assignDriver);
 router.post('/:bookingId/complete', auth, completePickupDrop);
 router.post('/:bookingId/report', auth, upload.array('images', 10), reportCondition);
 router.get('/earnings', auth, getEarnings);
-router.post('/:bookingId/rate', auth, rateDriver);
+router.post('/:bookingId/rate-driver', auth, rateDriver);
 router.get('/:bookingId/location', auth, getCarLocation);
 router.put('/:bookingId/location', auth, updateCarLocation);
 router.get('/bookings', auth, getDriverBookings);

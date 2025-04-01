@@ -194,19 +194,21 @@ exports.approveBooking = async (req, res) => {
 
 exports.getBookingById = async (req, res) => {
   try {
+
     const booking = await Booking.findById(req.params.id)
       .populate('vehicle', 'model type category')
       .populate('customer', 'name');
-  
+
     if (!booking) {
       return res.status(404).json({ msg: 'Booking not found' });
     }
-    if (booking.customer.toString() !== req.user.id) { // Fixed _id.toString()
+    if (booking.customer._id.toString() !== req.user.id) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
+
     res.json(booking);
   } catch (err) {
-    console.error(err);
+    console.error('Error in getBookingById:', err);
     res.status(500).json({ msg: 'Server error' });
   }
 };

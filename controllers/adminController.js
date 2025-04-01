@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Vehicle = require('../models/Vehicle');
 const Booking = require('../models/Booking');
 const ConditionReport = require('../models/ConditionReport');
+const { default: mongoose } = require('mongoose');
 
 exports.manageUser = async (req, res) => {
   const { id } = req.params;
@@ -180,7 +181,12 @@ exports.getConditionReports = async (req, res) => {
   try {
     const { bookingId } = req.query; // Optional query param to filter by booking
 
-    // Fetch all condition reports with populated fields
+    // Validate bookingId early
+    if (bookingId && !mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ msg: 'Invalid booking ID' });
+    }
+
+    // Fetch condition reports with populated fields
     const reports = await ConditionReport.find(bookingId ? { booking: bookingId } : {})
       .populate({
         path: 'booking',
@@ -237,11 +243,7 @@ exports.getConditionReports = async (req, res) => {
     });
 
     const result = Object.values(groupedReports);
-
-    if (bookingId && !mongoose.Types.ObjectId.isValid(bookingId)) {
-      return res.status(400).json({ msg: 'Invalid booking ID' });
-    }
-
+    console.log('Grouped Reports:', result); // Debug
     res.json({ reports: result });
   } catch (err) {
     console.error('Error in getConditionReports:', err.message);

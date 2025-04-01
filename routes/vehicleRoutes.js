@@ -19,7 +19,7 @@ router.get('/', getVehicles);
 router.get('/owner', auth, getOwnerVehicles);
 router.put('/:id', auth, upload.fields([{ name: 'images', maxCount: 10 }, { name: 'insuranceImage', maxCount: 1 }]), updateVehicle);
 router.delete('/:id', auth, deleteVehicle);
-router.post('/:id/rate', auth, rateVehicle);
+router.post('/:bookingId/rate-vehicle', auth, rateVehicle);
 router.get('/owner/reviews', auth, getOwnerVehicleReviews);
 router.put('/:id/approve', auth, approveVehicle);
 router.put('/:id/reject', auth, rejectVehicle);

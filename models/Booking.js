@@ -13,7 +13,7 @@ const bookingSchema = new mongoose.Schema({
   driverFee: { type: Number, default: 0 },
   status: { 
     type: String, 
-    enum: ['pending', 'approved', 'assigned', 'pickup-confirmed', 'delivered', 'completed', 'cancelled'], 
+    enum: ['pending', 'approved', 'assigned', 'pickup-confirmed', 'delivered', 'completed', 'cancelled','paid'], 
     default: 'pending' 
   }, // Added 'delivered' to reflect trip completion before final completion
   ownerApproved: { type: Boolean, default: false }, // Owner approves booking
