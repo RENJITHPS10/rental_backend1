@@ -109,4 +109,23 @@ exports.getLicenseStatus = async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 };
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('name email mobile license licenseStatus');
+    if (!user) return res.status(404).json({ msg: 'User not found' });
 
+    res.json({
+      msg: 'Profile retrieved',
+      user: {
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        license: user.license,
+        licenseStatus: user.licenseStatus,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};

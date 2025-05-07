@@ -103,7 +103,7 @@
       if (!booking || booking.driver?.toString() !== req.user.id || !booking.driverConfirmed) return res.status(400).json({ msg: 'Booking not eligible' });
       booking.status = 'completed';
       const vehicle = await Vehicle.findById(booking.vehicle);
-      vehicle.availability = true;
+      vehicle.availability = false;
       driver.availability = true;
       await booking.save();
       await vehicle.save();

@@ -58,7 +58,7 @@ exports.getBookings = async (req, res) => {
         .populate({
           path: 'vehicle',
           match: { owner: req.user.id },
-          select: 'model type category owner',
+          select: 'model type category owner registration',
         })
         .lean();
       bookings = bookings.filter(booking => booking.vehicle !== null);

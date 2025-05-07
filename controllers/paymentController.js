@@ -87,10 +87,11 @@ exports.createPayment = async (req, res) => {
       status: paymentIntent.status,
     });
   } catch (err) {
+    console.log(err)
     await session.abortTransaction();
-    console.error('Payment error:', err.stack);
+
     if (err instanceof stripe.errors.StripeError) {
-      return res.status(400).json({ msg: 'Payment failed', error: err.message });
+      return res.status(400).json({ msg: err.message });
     }
     res.status(500).json({ msg: 'Server error', error: err.message });
   } finally {
